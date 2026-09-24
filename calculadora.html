@@ -1,0 +1,286 @@
+<!DOCTYPE html><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Divisas BCV</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .card {
+            background-color: #1e293b;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid #334155;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin: 0 0 4px 0;
+            color: #34d399;
+        }
+        .estado {
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .tasas-grid {
+            display: grid;
+            grid-template-cols: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .tasa-box {
+            text-align: center;
+            padding: 8px;
+            background-color: rgba(51, 65, 85, 0.4);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .tasa-box span {
+            color: #94a3b8;
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        .tasa-usd-val { color: #34d399; font-weight: bold; }
+        .tasa-eur-val { color: #60a5fa; font-weight: bold; }
+        .campo {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        select, input {
+            width: 100%;
+            background-color: #334155;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 10px;
+            color: white;
+            font-size: 15px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        select:focus, input:focus {
+            border-color: #34d399;
+        }
+        .input-contenedor {
+            position: relative;
+        }
+        .badge {
+            position: absolute;
+            right: 12px;
+            top: 11px;
+            color: #94a3b8;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .resultado-box {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+            border-radius: 12px;
+            text-align: center;
+        }
+        .resultado-val {
+            font-size: 28px;
+            font-weight: 900;
+            color: #34d399;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🧮 Calculadora BCV</h1>
+        <div class="estado" id="estado-carga">🔄 Cargando historial local...</div>
+
+        <!-- NUEVO: Campo selector de Fecha Histórica -->
+        <div class="campo">
+            <label>Fecha de la Tasa Oficial</label>
+            <input type="date" id="selector-fecha">
+        </div>
+
+        <div class="tasas-grid">
+            <div class="tasa-box">
+                <span>💵 Dólar (USD)</span>
+                <div id="tasa-usd" class="tasa-usd-val">---</div>
+            </div>
+            <div class="tasa-box">
+                <span>💶 Euro (EUR)</span>
+                <div id="tasa-eur" class="tasa-eur-val">---</div>
+            </div>
+        </div>
+
+        <div class="campo">
+            <label>Dirección del cambio</label>
+            <select id="direccion-cambio">
+                <option value="divisa-to-ves">De Moneda Extranjera ➡️ Bolívares (Bs)</option>
+                <option value="ves-to-divisa" selected>De Bolívares (Bs) ➡️ Moneda Extranjera</option>
+            </select>
+        </div>
+
+        <div class="campo">
+            <label>Moneda de Cambio</label>
+            <select id="select-moneda">
+                <option value="USD" selected>💵 Dólar Estadounidense (USD)</option>
+                <option value="EUR">💶 Euro (EUR)</option>
+            </select>
+        </div>
+
+        <div class="campo">
+            <label id="label-monto">Monto a convertir</label>
+            <div class="input-contenedor">
+                <input type="number" id="input-monto" placeholder="0.00" step="any">
+                <span id="badge-moneda" class="badge">VES</span>
+            </div>
+        </div>
+
+        <div class="resultado-box">
+            <label>Resultado Equivalente</label>
+            <div id="texto-resultado" class="resultado-val">0,00</div>
+        </div>
+    </div>
+
+     <script>
+        let baseDeDatosHistorial = {};
+        const tasasActivas = { USD: 0, EUR: 0 };
+
+        const estadoCarga = document.getElementById('estado-carga');
+        const selectorFecha = document.getElementById('selector-fecha');
+        const inputMonto = document.getElementById('input-monto');
+        const selectMoneda = document.getElementById('select-moneda');
+        const direccionCambio = document.getElementById('direccion-cambio');
+        const badgeMoneda = document.getElementById('badge-moneda');
+        const labelMonto = document.getElementById('label-monto');
+        const textoResultado = document.getElementById('texto-resultado');
+
+        const formatearMoneda = (valor) => {
+            return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+        };
+
+        const obtenerFechaActualISO = () => {
+            const hoy = new Date();
+            const offset = hoy.getTimezoneOffset();
+            const fechaLocal = new Date(hoy.getTime() - (offset * 60 * 1000));
+            return fechaLocal.toISOString().split('T')[0];
+        };
+
+        async function cargarHistorial() {
+            const hoyStr = obtenerFechaActualISO();
+            selectorFecha.value = hoyStr;
+
+            try {
+                const response = await fetch('tasas.json');
+                baseDeDatosHistorial = await response.json();
+
+                estadoCarga.textContent = "✅ Historial de tasas cargado de forma local";
+                estadoCarga.style.color = "#34d399";
+            } catch (error) {
+                estadoCarga.textContent = "⚠️ Error CORS / No hay JSON. Usando datos por defecto.";
+                estadoCarga.style.color = "#fbbf24";
+
+                // Valores por defecto por si se abre como archivo local bloqueado
+                baseDeDatosHistorial[hoyStr] = { USD: 54.50, EUR: 59.20 };
+            }
+
+            cambiarFechaDeTasas();
+        }
+
+        function cambiarFechaDeTasas() {
+            const fechaElegida = selectorFecha.value;
+            const datosDelDia = baseDeDatosHistorial[fechaElegida];
+
+            if (datosDelDia) {
+                tasasActivas.USD = datosDelDia.USD;
+                tasasActivas.EUR = datosDelDia.EUR;
+
+                document.getElementById('tasa-usd').textContent = `${formatearMoneda(tasasActivas.USD)} Bs`;
+                document.getElementById('tasa-eur').textContent = `${formatearMoneda(tasasActivas.EUR)} Bs`;
+
+                if (estadoCarga.style.color !== "rgb(251, 191, 36)") {
+                    estadoCarga.textContent = `✅ Tasas cargadas para el día: ${fechaElegida}`;
+                    estadoCarga.style.color = "#34d399";
+                }
+            } else {
+                tasasActivas.USD = 0;
+                tasasActivas.EUR = 0;
+                document.getElementById('tasa-usd').textContent = "---";
+                document.getElementById('tasa-eur').textContent = "---";
+                estadoCarga.textContent = "❌ No hay registros para la fecha seleccionada";
+                estadoCarga.style.color = "#ef4444";
+            }
+            calcular();
+        }
+
+        function calcular() {
+            const monto = parseFloat(inputMonto.value) || 0;
+            const monedaSeleccionada = selectMoneda.value;
+            const tasaActual = tasasActivas[monedaSeleccionada];
+            const modo = direccionCambio.value;
+
+            if (monto === 0 || !tasaActual || tasaActual === 0) {
+                textoResultado.textContent = "0,00";
+                return;
+            }
+
+            let resultado = 0;
+            let sufijo = "Bs";
+
+            if (modo === "divisa-to-ves") {
+                resultado = monto * tasaActual;
+                sufijo = "Bs";
+            } else {
+                resultado = monto / tasaActual;
+                sufijo = monedaSeleccionada === "USD" ? "\$" : "€";
+            }
+
+            textoResultado.textContent = `${formatearMoneda(resultado)} ${sufijo}`;
+        }
+
+        function actualizarInterfaz() {
+            const modo = direccionCambio.value;
+            const moneda = selectMoneda.value;
+
+            if (modo === "divisa-to-ves") {
+                labelMonto.textContent = `Monto a convertir en ${moneda === 'USD' ? 'Dólares ($)' : 'Euros (€)'}`;
+                badgeMoneda.textContent = moneda;
+            } else {
+                labelMonto.textContent = "Monto a convertir en Bolívares (Bs)";
+                badgeMoneda.textContent = "VES";
+            }
+            calcular();
+        }
+
+        selectorFecha.addEventListener('change', cambiarFechaDeTasas);
+        inputMonto.addEventListener('input', calcular);
+        selectMoneda.addEventListener('change', actualizarInterfaz);
+        direccionCambio.addEventListener('change', actualizarInterfaz);
+
+        window.addEventListener('DOMContentLoaded', cargarHistorial);
+    </script>
+</body>
+</html>
