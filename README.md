@@ -14,7 +14,7 @@ Para instalar este proyecto en tu sistema, abre una terminal y ejecuta los sigui
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com
+git clone (https://github.com/elroi-133/bcv-calculator.git)
 cd TU_REPOSITORIO
 
 # 2. Dar permisos al instalador y ejecutarlo
